@@ -17,7 +17,7 @@ It is the Nahuatl counterpart of *An Dúshlán*, an Irish-language game in the F
 
 **Options on the start screen**
 
-- **Order of the states:** alphabetical, north to south, south to north, population largest first, or population smallest first. The population orders show each state's 2020 census figure as it fills.
+- **Order of the states:** south to north (the default), north to south, or land area smallest to largest. The area order shows each state's size in km² as it fills.
 - **Answers:** Spanish or English. The choice is remembered on the device.
 - **Modes:** *Solo*, or *Multijugador* for 2 to 6 players taking turns over 1 to 5 rounds. Scores add up across rounds, and a perfect run of 32 scores double (64).
 
@@ -30,7 +30,7 @@ No word repeats within a run. When a run ends, the correct answer is shown in bo
 | `index.html` | Front page. Redirects to the game. |
 | `reto-nahuatl.html` | The game: screens, styles and logic. |
 | `diccionario-nahuatl.js` | The word list. Each entry is `word: [Spanish, English, audio file]`. |
-| `mapa-mexico.js` | The 32 state outlines as SVG paths, 2020 populations, and the fill orders. |
+| `mapa-mexico.js` | The 32 state outlines as SVG paths, land areas, and the fill orders. |
 
 There is no build step and no dependencies. It is plain HTML and JavaScript and runs from any static host or straight from the folder.
 
@@ -71,7 +71,7 @@ The words are **Eastern Huasteca Nahuatl**, spoken in Veracruz, Hidalgo and San 
 - **Words, meanings and recordings:** [Online Nahuatl Dictionary](https://nahuatl.wired-humanities.org/), ed. Stephanie Wood (Wired Humanities Projects, College of Education, University of Oregon, 2000 to present), including modern Huasteca Nahuatl entries from the Instituto de Docencia e Investigación Etnológica de Zacatecas (IDIEZ).
 - **Voices:** Eduardo de la Cruz Cruz, Ofelia Cruz Morales, and other Eastern Huasteca Nahuatl speakers recorded for the dictionary. Some recordings do not name their speaker yet.
 - **Map:** [Natural Earth](https://www.naturalearthdata.com/) admin-1 boundaries (public domain), simplified for screen use.
-- **Population:** INEGI, *Censo de Población y Vivienda 2020* (national total 126,014,024).
+- **Land area:** INEGI, *Superficie continental* (national total 1,960,646.66 km²).
 - **Spanish meanings:** draft translations from the dictionary's English and Nahuatl definitions, to be checked by a native speaker.
 
 ## Audio and permissions

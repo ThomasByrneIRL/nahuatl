@@ -262,7 +262,7 @@ h1 { font-size: 2rem; color: #e94560; margin-bottom: .4rem; }
 </div>
 
 <script src="diccionario-nahuatl.js?v=1"></script><!-- bump ?v= whenever a script file changes, so browsers fetch the new copy -->
-<script src="mapa-mexico.js?v=1"></script>
+<script src="mapa-mexico.js?v=2"></script>
 <script>
 
 const WORDS = Object.keys(DICT);
@@ -738,7 +738,7 @@ document.addEventListener('keydown', e => {
 
 show('start-screen');
 setLang(LANG);
-// State order picker (alphabetical by default; remembered on this device)
+// State order picker (south to north by default; remembered on this device)
 function pickOrd(key) {
   setEstadoOrd(key);
   try { localStorage.setItem('reto_ord', ESTADO_ORD.key); } catch (e) {}
@@ -747,7 +747,7 @@ function pickOrd(key) {
 if (HAS_MAP && typeof ESTADO_ORDENES !== 'undefined') {
   const sel = document.getElementById('ord-sel');
   sel.innerHTML = Object.entries(ESTADO_ORDENES).map(([k, o]) => '<option value="' + k + '">' + o.es + '</option>').join('');
-  let saved = 'alfabetico'; try { saved = localStorage.getItem('reto_ord') || 'alfabetico'; } catch (e) {}
+  let saved = ESTADO_ORD_DEFAULT; try { saved = localStorage.getItem('reto_ord') || ESTADO_ORD_DEFAULT; } catch (e) {}
   setEstadoOrd(saved); sel.value = ESTADO_ORD.key;
   document.getElementById('ord-row').style.display = 'block';
 }
