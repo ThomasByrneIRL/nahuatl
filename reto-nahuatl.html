@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Reto Náhuatl</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f5f5f0; color: #1a1a2e; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+.screen { display: none; text-align: center; padding: 2rem; max-width: 520px; width: 100%; }
+
+h1 { font-size: 2rem; color: #e94560; margin-bottom: .4rem; }
+.subtitle { color: #888; margin-bottom: 1.4rem; font-size: .93rem; }
+
+/* ── Mode buttons ── */
+.mode-wrap { display: flex; gap: 1rem; justify-content: center; margin-top: 1.4rem; }
+.mode-btn { flex: 1; max-width: 180px; padding: .9rem 1rem; border: 2.5px solid #e94560; border-radius: 12px; background: #fff; color: #e94560; font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: background .15s; font-family: Georgia, 'Times New Roman', serif; }
+.mode-btn:hover { background: #fff5f6; }
+
+/* ── Answer language switch ── */
+.lang-row { display: flex; gap: .4rem; justify-content: center; align-items: center; margin: 0 0 .6rem; }
+.lang-row span { color: #888; font-size: .85rem; margin-right: .2rem; }
+.lang-btn { padding: .3rem .8rem; border: 2px solid #ddd; border-radius: 999px; background: #fff; color: #555; font-size: .85rem; font-weight: bold; cursor: pointer; }
+.lang-btn.on { border-color: #e94560; background: #e94560; color: #fff; }
+
+/* ── Setup ── */
+.setup-count { display: flex; gap: .6rem; justify-content: center; margin: 1rem 0 1.3rem; flex-wrap: wrap; }
+.cnt-btn { width: 42px; height: 42px; border-radius: 50%; border: 2px solid #ddd; background: #fff; font-size: 1rem; font-weight: bold; cursor: pointer; color: #555; transition: border-color .15s, color .15s; }
+.cnt-btn.active { border-color: #e94560; color: #e94560; }
+.player-fields { display: flex; flex-direction: column; gap: .6rem; margin-bottom: 1.3rem; }
+.player-row { display: flex; align-items: center; gap: .7rem; }
+.pcolor-dot { width: 16px; height: 16px; border-radius: 50%; flex-shrink: 0; }
+.player-input { flex: 1; padding: .55rem .75rem; border: 1.5px solid #ddd; border-radius: 8px; font-size: 1rem; outline: none; }
+.player-input:focus { border-color: #e94560; }
+
+/* ── Handoff ── */
+#handoff-name { font-size: 2rem; font-weight: bold; margin: .7rem 0 .2rem; }
+#handoff-sub { font-size: 1rem; color: #555; margin-bottom: .5rem; }
+#handoff-target { background: #1a1a2e; color: #fff; border-radius: 10px; padding: .6rem 1rem; font-size: .97rem; margin-bottom: 1.2rem; display: block; line-height: 1.6; }
+
+/* ── Progress dots (fallback if the map file fails to load) ── */
+.county-dots { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-bottom: .9rem; }
+.cdot { width: 13px; height: 13px; border-radius: 50%; background: #ddd; transition: background .2s; flex-shrink: 0; }
+.cdot.done { background: #2a9d47; }
+.cdot.active { background: #e94560; }
+/* ── State map (mapa-mexico.js): each correct answer fills the next state in green. Mexico is wide, so width is capped by height × 1.587 ── */
+.cmap { position: relative; width: 100%; max-width: min(380px, calc(30vh * 1.587)); margin: 0 auto .4rem; }
+.cmap svg { width: 100%; height: auto; display: block; }
+.cmap path { fill: #e3e3dc; stroke: #fff; stroke-width: 1.6; stroke-linejoin: round; transition: fill .4s; }
+.cmap path.done { fill: #2a9d47; }
+.cmap path.now { fill: #e94560; animation: cglow 1s ease-in-out infinite; }
+.cmap path.lost { fill: #e94560; }
+.cmap.win path { fill: #2a9d47; animation: cwin 1.2s ease-in-out 2; }
+@keyframes cglow { 0%,100% { fill: #e94560; } 50% { fill: #f6a5b2; } }
+@keyframes cwin { 0%,100% { fill: #2a9d47; } 50% { fill: #7fd69a; } }
+#cpop { position: absolute; left: 50%; top: 44%; transform: translate(-50%,-50%) scale(.6); background: #fff; color: #2a9d47; font-weight: bold; font-size: 1.15rem; padding: .35rem .85rem; border-radius: 999px; box-shadow: 0 2px 12px rgba(0,0,0,.18); opacity: 0; transition: all .25s; pointer-events: none; white-space: nowrap; }
+#cpop.show { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+#word-num-label b { color: #1a1a2e; }
+/* Game screen tightened so the map, word and both answers fit without scrolling on laptops and phones */
+#game-screen { padding: .8rem 1.2rem 1rem; }
+#game-screen .cmap { max-width: min(360px, calc(24vh * 1.587)); margin-bottom: .2rem; }
+#game-screen #score-display { font-size: 2.4rem; margin-bottom: 0; }
+#game-screen #score-unit { display: none; }
+#game-screen #pts-flash { height: 1.2rem; font-size: 1.1rem; margin-bottom: .2rem; }
+#game-screen .word-timer-wrap { margin-bottom: .7rem; }
+#game-screen .card { padding: 1.1rem 1.2rem 1rem; min-height: 0; margin-bottom: .7rem; }
+#game-screen #word-display { font-size: clamp(1.5rem, 7vw, 2.2rem); }
+#game-screen .choices { gap: .55rem; margin-bottom: .3rem; }
+#game-screen .choice-btn { padding: .8rem 1.1rem; }
+#game-screen .hint { margin-top: .1rem; }
+
+/* ── Player HUD ── */
+#player-hud { font-size: 1.05rem; font-weight: bold; margin-bottom: .25rem; min-height: 1.4rem; }
+#target-hud { font-size: .86rem; font-weight: bold; background: #1a1a2e; color: #fff; border-radius: 8px; padding: .35rem .8rem; margin-bottom: .5rem; display: none; }
+
+/* ── Score / current value ── */
+#word-num-label { font-size: .88rem; color: #888; margin-bottom: .15rem; }
+#score-display { font-size: 3.8rem; font-weight: bold; color: #e94560; letter-spacing: .04em; font-variant-numeric: tabular-nums; line-height: 1; margin-bottom: .15rem; }
+#score-unit { font-size: .85rem; color: #aaa; margin-bottom: .5rem; }
+#pts-flash { font-size: 1.3rem; font-weight: bold; color: #2a9d47; height: 1.6rem; margin-bottom: .3rem; transition: opacity .3s; }
+
+/* ── Timer bar ── */
+.word-timer-wrap { margin-bottom: 1.1rem; height: 6px; background: #ddd; border-radius: 3px; overflow: hidden; }
+#word-timer-bar { height: 6px; border-radius: 3px; background: #2a9d47; width: 100%; transition: background .3s; }
+#word-timer-bar.urgent { background: #e94560; }
+
+/* ── Word card ── */
+.card { background: #fff; border-radius: 16px; padding: 2.2rem 2rem 1.8rem; margin-bottom: 1.1rem; min-height: 110px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 16px rgba(0,0,0,.10); transition: background .15s; }
+.card.flash-correct { background: #d4edda; }
+.card.flash-dead    { background: #f8d7da; }
+#word-display { font-size: 2.5rem; font-weight: bold; letter-spacing: .03em; color: #1a1a2e; overflow-wrap: anywhere; }
+
+/* ── Choices ── */
+.choices { display: flex; flex-direction: column; gap: .7rem; margin-bottom: .55rem; }
+.choice-btn { width: 100%; padding: .95rem 1.2rem; border: 2px solid #ddd; border-radius: 12px; background: #fff; color: #1a1a2e; font-size: 1.05rem; cursor: pointer; text-align: left; line-height: 1.4; box-shadow: 0 1px 4px rgba(0,0,0,.06); transition: border-color .15s, background .15s; }
+@media (hover:hover){.choice-btn:hover:not(:disabled) { border-color: #bbb; background: #fafafa; }}  /* phones keep :hover after a tap, so only real mice get it */
+.choice-btn.selected-correct { border-color: #2a9d47; background: #d4edda; color: #1a5c2e; font-weight: bold; }
+.choice-btn.selected-wrong   { border-color: #e94560; background: #f8d7da; color: #7b1a28; }
+.choice-btn.reveal-correct   { border-color: #2a9d47; background: #d4edda; color: #1a5c2e; }
+.choice-btn:disabled { cursor: default; }
+.hint { color: #aaa; font-size: .75rem; margin-top: .3rem; }
+
+/* ── Buttons ── */
+.big-btn { background: #e94560; color: #fff; border: none; border-radius: 12px; padding: 1rem 2.5rem; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: 1rem; box-shadow: 0 2px 10px rgba(233,69,96,0.3); transition: background .15s; }
+.big-btn:hover { background: #c73652; }
+.big-btn.gold { background: #e07b00; box-shadow: 0 2px 10px rgba(224,123,0,0.3); }
+.big-btn.gold:hover { background: #b86200; }
+.ghost-btn { background: transparent; color: #888; border: 1.5px solid #ddd; border-radius: 12px; padding: .75rem 1.8rem; font-size: 1rem; cursor: pointer; margin-top: .6rem; margin-left: .5rem; transition: border-color .15s; }
+.ghost-btn:hover { border-color: #aaa; }
+
+/* ── Over / Victory ── */
+#over-player { font-size: 1.4rem; font-weight: bold; margin-bottom: .3rem; }
+#over-reached { font-size: 1rem; color: #555; margin-bottom: .2rem; }
+#over-score { font-size: 4.2rem; font-weight: bold; color: #e94560; letter-spacing: .04em; margin: .2rem 0; font-variant-numeric: tabular-nums; }
+#over-wrong-word { color: #e94560; font-size: .95rem; margin: .6rem 0 1rem; }
+.over-dots { margin: .6rem 0; }
+
+/* Victory */
+#victory-score { font-size: 3.5rem; font-weight: bold; color: #e07b00; font-variant-numeric: tabular-nums; margin: .5rem 0; letter-spacing: .03em; }
+#victory-player { font-size: 1.5rem; font-weight: bold; margin-bottom: .4rem; }
+.victory-star { font-size: 3rem; margin-bottom: .5rem; }
+
+/* ── Leaderboard ── */
+.lb-row { display: flex; align-items: center; gap: .8rem; background: #fff; border-radius: 12px; padding: .8rem 1rem; margin-bottom: .55rem; box-shadow: 0 1px 6px rgba(0,0,0,.07); text-align: left; }
+.lb-winner { background: #fff8e1; border: 2px solid #e07b00; }
+.lb-rank { font-size: 1.4rem; width: 2rem; text-align: center; flex-shrink: 0; }
+.lb-dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
+.lb-name { flex: 1; font-size: 1.05rem; font-weight: bold; }
+.lb-score { font-size: 1.2rem; font-weight: bold; font-variant-numeric: tabular-nums; }
+  .rnd-row { display:flex; gap:8px; justify-content:center; margin:.4rem 0 1.4rem; }
+  .rnd-btn { width:44px;height:44px;border-radius:10px;border:2px solid #ddd;background:#fff;font-size:1.05rem;font-weight:bold;cursor:pointer;color:#1a1a2e; }
+  .rnd-btn.on { background:#e94560;border-color:#e94560;color:#fff; }
+  .lb-rounds { display:block;font-size:.75rem;color:#999;font-weight:normal; }
+  /* live scoreboard (multiplayer): chip strip on phones/tablets, sidebar on wide screens */
+  #live-board { display:none; flex-wrap:wrap; gap:6px; justify-content:center; margin:0 0 1.6rem; }
+  #live-board .brk { flex-basis:100%; height:0; }
+  #live-board.on { display:flex; }
+  .lv { display:flex; align-items:center; gap:5px; padding:3px 9px; border:1.5px solid #e3e3dc; border-radius:999px;
+        background:#fff; font-size:.78rem; line-height:1.4; }
+  .lv .dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .lv .nm { max-width:6.5em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; color:#555; }
+  .lv .sc { font-weight:bold; font-variant-numeric:tabular-nums; color:#1a1a2e; }
+  .lv.cur { background:#f0f0ea; }
+  .lv.lead { border:2.5px solid #1a1a2e; padding:2px 8px; }
+  .lv.lead .nm { color:#1a1a2e; }
+  .lv.pulse { animation:lvpulse .6s ease; }
+  @keyframes lvpulse { 0%{transform:scale(1)} 40%{transform:scale(1.15)} 100%{transform:scale(1)} }
+  @media (min-width:1000px) {
+    #live-board.on { position:fixed; right:28px; top:50%; transform:translateY(-50%); flex-direction:column;
+                     width:210px; margin:0; gap:8px; }
+    #live-board.on::before { content:'Marcador'; font-weight:bold; color:#999; font-size:.75rem; letter-spacing:.1em;
+                     text-transform:uppercase; text-align:left; margin-bottom:2px; }
+    .lv { border-radius:10px; padding:8px 12px; font-size:.95rem; justify-content:space-between; }
+    .lv.lead { padding:7px 11px; }
+    .lv .nm { max-width:9em; flex:1; text-align:left; }
+    #live-board .brk { display:none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- START -->
+<div id="start-screen" class="screen" style="padding-top:1rem;padding-bottom:1rem">
+  <h1>🏅 Reto Náhuatl</h1>
+  <p class="subtitle" style="margin-bottom:.6rem">32 palabras seguidas. Un estado por palabra. Una palabra mal y se acabó.</p>
+  <div id="start-map" style="max-width:min(340px, calc(26vh * 1.587));margin:0 auto .5rem"></div>
+  <div id="ord-row" style="display:none;margin:0 0 .5rem">
+    <label for="ord-sel" style="color:#888;font-size:.85rem">Orden de los estados:</label>
+    <select id="ord-sel" onchange="pickOrd(this.value)" style="font-size:.95rem;padding:.35rem .6rem;border:2px solid #e94560;border-radius:10px;color:#e94560;background:#fff;font-weight:bold;font-family:Georgia,'Times New Roman',serif;margin-left:.3rem;max-width:100%"></select>
+  </div>
+  <div class="lang-row">
+    <span>Respuestas:</span>
+    <button class="lang-btn" data-l="0" onclick="setLang(0)">Español</button>
+    <button class="lang-btn" data-l="1" onclick="setLang(1)">English</button>
+  </div>
+  <p style="color:#666;margin-bottom:.4rem;line-height:1.55;font-size:.92rem">
+    Escucha la palabra y elige su significado · <span style="color:#1a6fb5">5 segundos</span> por palabra<br>
+    Error o tiempo agotado → <span style="color:#e94560">¡fuera!</span> · 32 seguidas → <span style="color:#e07b00">¡victoria total!</span>
+  </p>
+  <div class="mode-wrap">
+    <button class="mode-btn" onclick="startSolo()">Solo</button>
+    <button class="mode-btn" onclick="startMulti()">Multijugador</button>
+  </div>
+  <p style="font-size:.62rem;color:#aaa;margin-top:.8rem;line-height:1.5">Palabras y audio: Online Nahuatl Dictionary (Wired Humanities Projects, Universidad de Oregón) e IDIEZ, Zacatecas<br>Voces: Eduardo de la Cruz Cruz, Ofelia Cruz Morales y otros hablantes del náhuatl de la Huasteca · Mapa: Natural Earth</p>
+</div>
+
+<!-- SETUP -->
+<div id="setup-screen" class="screen">
+  <h1>🏅 Reto Náhuatl</h1>
+  <p class="subtitle">¿Cuántos jugadores?</p>
+  <div class="setup-count" id="count-btns"></div>
+  <div class="player-fields" id="player-fields"></div>
+  <p class="subtitle">¿Cuántas rondas?</p>
+  <div class="rnd-row">
+    <button class="rnd-btn on" onclick="setRounds(1)">1</button>
+    <button class="rnd-btn" onclick="setRounds(2)">2</button>
+    <button class="rnd-btn" onclick="setRounds(3)">3</button>
+    <button class="rnd-btn" onclick="setRounds(4)">4</button>
+    <button class="rnd-btn" onclick="setRounds(5)">5</button>
+  </div>
+  <p style="color:#888;font-size:.85rem;margin-bottom:.8rem">32 palabras correctas seguidas = puntos dobles (64)</p>
+  <button class="big-btn" onclick="setupDone()">Siguiente →</button>
+</div>
+
+<!-- HANDOFF -->
+<div id="handoff-screen" class="screen">
+  <h1>🏅 Reto Náhuatl</h1>
+  <div id="handoff-name"></div>
+  <div id="handoff-sub"></div>
+  <div id="handoff-target"></div>
+  <button class="big-btn" id="handoff-btn" onclick="handoffStart()">Empezar</button>
+</div>
+
+<!-- GAME -->
+<div id="game-screen" class="screen">
+  <div id="player-hud"></div>
+  <div id="live-board"></div>
+  <div id="target-hud"></div>
+  <div class="county-dots" id="county-dots"></div><div id="cpop"></div>
+  <div id="word-num-label"></div>
+  <div id="score-display">0</div>
+  <div id="score-unit">/ 32</div>
+  <div id="pts-flash"></div>
+  <div class="word-timer-wrap"><div id="word-timer-bar"></div></div>
+  <div class="card" id="word-card"><div id="word-display"></div></div>
+  <div class="choices">
+    <button class="choice-btn" id="choice-a" onclick="pick(0)" tabindex="-1"></button>
+    <button class="choice-btn" id="choice-b" onclick="pick(1)" tabindex="-1"></button>
+  </div>
+  <p class="hint">↑ arriba · ↓ abajo</p>
+</div>
+
+<!-- BUST (game over) -->
+<div id="over-screen" class="screen">
+  <h1>¡Fuera!</h1>
+  <div id="over-player"></div>
+  <div id="over-reached"></div>
+  <div class="over-dots" id="over-dots" style="margin:.6rem auto"></div>
+  <div id="over-score">0</div>
+  <div id="over-wrong-word"></div>
+  <div id="over-actions"></div>
+</div>
+
+<!-- VICTORY -->
+<div id="victory-screen" class="screen">
+  <div class="victory-star">🏆</div>
+  <h1 style="color:#e07b00">¡Victoria!</h1>
+  <p style="color:#555;margin-bottom:.4rem">¡32 estados! ¡32 palabras correctas!</p>
+  <div id="victory-player"></div>
+  <div id="victory-score">32</div>
+  <p style="color:#aaa;font-size:.85rem;margin-bottom:.4rem">pts</p>
+  <div class="county-dots" id="victory-dots" style="margin:.8rem auto"></div>
+  <div id="victory-actions"></div>
+</div>
+
+<!-- FINAL LEADERBOARD -->
+<div id="final-screen" class="screen">
+  <h1 id="final-title">🏆 ¡Fin!</h1>
+  <p class="subtitle" id="final-sub"></p>
+  <div id="lb-list" style="margin:1.2rem 0"></div>
+  <div id="final-actions"><button class="big-btn" onclick="goStart()">Otra vez</button></div>
+</div>
+
+<script src="diccionario-nahuatl.js?v=1"></script><!-- bump ?v= whenever a script file changes, so browsers fetch the new copy -->
+<script src="mapa-mexico.js?v=1"></script>
+<script>
+
+const WORDS = Object.keys(DICT);
+const WORD_MS = 5000;
+const TOTAL_WORDS = 32;
+const PCOLS = ['#e94560','#1565c0','#2a9d47','#e07b00','#8b5cf6','#0891b2'];
+const ALL_SCREENS = ['start-screen','setup-screen','handoff-screen','game-screen','over-screen','victory-screen','final-screen'];
+
+/* ── Answer language: 0 = Spanish (default), 1 = English; remembered on this device ── */
+let LANG = 0;
+try { LANG = localStorage.getItem('reto_resp') === '1' ? 1 : 0; } catch (e) {}
+function setLang(l) {
+  LANG = l ? 1 : 0;
+  try { localStorage.setItem('reto_resp', String(LANG)); } catch (e) {}
+  document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('on', Number(b.dataset.l) === LANG));
+}
+function meaning(w) { return DICT[w][LANG]; }
+function audioUrl(w) { return AUDIO_BASE + DICT[w][2]; }
+
+/* ── Game state ── */
+let wordNum = 1;         // 1-32, current word being attempted
+let locked = false;
+let correctIdx = 0;
+let currentWord = '';
+let wordDeadline, wordRAF;
+let flashTimer;
+let _ca = null, _nextAudio = null, _nextWord = null;
+let currentScreen = 'start-screen';
+// Words already shown this run: with a pool of about 80, a run of 32 never repeats a word
+let usedWords = new Set();
+
+/* ── Multiplayer state ── */
+let mode = 'solo';
+let numPlayers = 1, playerNames = [], playerScores = [];
+let currentPlayerIdx = 0, leaderIdx = -1, leaderScore = 0;
+let selectedCount = 2;
+// Multiplayer rounds (1–5, default 1): scores add up, highest total wins; a perfect run of 32 scores double (64)
+let numRounds = 1, curRound = 1, roundScores = [], turnLive = 0;
+const PERFECT_BONUS = 2;
+
+/* ── Helpers ── */
+function show(id) {
+  ALL_SCREENS.forEach(s => document.getElementById(s).style.display = (s === id) ? 'block' : 'none');
+  currentScreen = id;
+}
+
+function fmtFull(n) { return n.toLocaleString('es-MX'); }
+
+function pn(i) { return playerNames[i] || ('Jugador ' + (i+1)); }
+function pc(i) { return PCOLS[i % PCOLS.length]; }
+
+// Next word for the run: not shown yet this run, and not the current word
+function freshWord(ex) {
+  let pool = WORDS.filter(w => !usedWords.has(w) && w !== ex);
+  if (!pool.length) pool = WORDS.filter(w => w !== ex);
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+// Wrong answer: any other word whose meaning differs from the right one
+function rnd(ex) { let w; do { w = WORDS[Math.floor(Math.random()*WORDS.length)]; } while (w === ex || meaning(w) === meaning(ex)); return w; }
+function sh(a) { a=a.slice(); for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
+
+// Progress: the state map (mapa-mexico.js) if it loaded, otherwise a row of 32 dots.
+// current = the word being attempted (1–32); states before it are green. state: 'now' (glowing), 'lost' (red), 'win' (all green)
+const HAS_MAP = typeof ESTADO_PATHS !== 'undefined';
+function buildDots(containerId, current, state) {
+  const el = document.getElementById(containerId);
+  if (HAS_MAP) {
+    el.className = 'cmap' + (state === 'win' ? ' win' : '');
+    if (!el.firstChild || el.firstChild.tagName !== 'svg' || el.dataset.ord !== ESTADO_ORD.key) {
+      el.dataset.ord = ESTADO_ORD.key;
+      const keep = document.getElementById('cpop'); if (keep && el.contains(keep)) el.removeChild(keep);   // keep the ✓ pop-up when redrawing
+      el.innerHTML = '<svg viewBox="' + MAPA_VIEWBOX + '">' + ESTADO_ORD.map(([es, key], i) => '<path data-i="' + i + '" d="' + ESTADO_PATHS[key] + '"><title>' + es + '</title></path>').join('') + '</svg>';
+      if (keep) el.appendChild(keep);
+    }
+    el.querySelectorAll('path').forEach(p => {
+      const i = +p.dataset.i + 1;
+      p.setAttribute('class', (state === 'win' || i < current) ? 'done' : i === current ? (state || 'now') : '');
+    });
+    if (containerId === 'county-dots') { const pop = document.getElementById('cpop'); if (pop && pop.parentNode !== el) el.appendChild(pop); }
+    return;
+  }
+  el.innerHTML = '';
+  for (let i = 1; i <= TOTAL_WORDS; i++) {
+    const d = document.createElement('div');
+    d.className = 'cdot' + (i < current ? ' done' : (i === current ? ' active' : ''));
+    el.appendChild(d);
+  }
+}
+
+/* ── Audio: native-speaker recordings from the Online Nahuatl Dictionary ── */
+function preloadFor(word) {
+  if (_nextAudio) { _nextAudio.pause(); _nextAudio = null; }
+  const a = new Audio(audioUrl(word));
+  a.onerror = function(){};
+  a.muted = true;
+  a.play().catch(function(){});
+  _nextAudio = a; _nextWord = word;
+}
+
+function playWord(word) {
+  if (_nextAudio && _nextWord === word) {
+    const a = _nextAudio; _nextAudio = null; _nextWord = null;
+    if (_ca) { _ca.pause(); _ca = null; }
+    a.muted = false; a.currentTime = 0;
+    a.play().catch(function(){}); _ca = a;
+  } else {
+    if (_ca) { _ca.pause(); _ca = null; }
+    const a = new Audio(audioUrl(word));
+    a.onerror = function(){};
+    a.play().catch(function(){}); _ca = a;
+  }
+}
+
+/* ── Sound FX: (frequency, duration, wave type, volume, delay) ── */
+let _sfx = null;
+function _gx(){if(!_sfx)_sfx=new(window.AudioContext||window.webkitAudioContext)();if(_sfx.state!=='running')_sfx.resume();return _sfx;}
+function _pt(f,d,t,g,dl){try{const c=_gx(),o=c.createOscillator(),gn=c.createGain(),t0=c.currentTime+0.03+dl;o.connect(gn);gn.connect(c.destination);o.type=t;o.frequency.setValueAtTime(f,t0);gn.gain.setValueAtTime(g,t0);gn.gain.exponentialRampToValueAtTime(0.0001,t0+d);o.start(t0);o.stop(t0+d);}catch(e){}}
+function playOk(){_pt(523,.55,'sine',.22,0);_pt(659,.65,'sine',.2,.12);}
+function playNo(){_pt(220,.45,'sawtooth',.18,0);_pt(150,.5,'sawtooth',.14,.08);}
+function playVictory(){_pt(523,.55,'sine',.22,0);_pt(659,.55,'sine',.22,.18);_pt(784,.6,'sine',.22,.36);_pt(1047,.8,'sine',.22,.6);}
+
+/* ══════════ MODE SELECTION ══════════ */
+function goStart() { show('start-screen'); }
+
+function startSolo() {
+  mode = 'solo'; numPlayers = 1; playerNames = ['']; playerScores = [-1];
+  leaderIdx = -1; leaderScore = 0; currentPlayerIdx = 0;
+  usedWords = new Set();
+  const w = freshWord();
+  preloadFor(w); initGame(w);
+}
+
+function startMulti() {
+  mode = 'multi'; buildSetup(2); show('setup-screen');
+}
+
+/* ══════════ SETUP ══════════ */
+function buildSetup(n) {
+  selectedCount = n;
+  const cb = document.getElementById('count-btns');
+  cb.innerHTML = '';
+  for (let i = 2; i <= 6; i++) {
+    const b = document.createElement('button');
+    b.className = 'cnt-btn' + (i === n ? ' active' : '');
+    b.textContent = i;
+    b.onclick = () => buildSetup(i);
+    cb.appendChild(b);
+  }
+  const pf = document.getElementById('player-fields');
+  const existing = [];
+  pf.querySelectorAll('.player-input').forEach(inp => existing.push(inp.value));
+  pf.innerHTML = '';
+  for (let i = 0; i < n; i++) {
+    const row = document.createElement('div'); row.className = 'player-row';
+    const dot = document.createElement('div'); dot.className = 'pcolor-dot'; dot.style.background = PCOLS[i];
+    const inp = document.createElement('input'); inp.className = 'player-input'; inp.type = 'text';
+    inp.placeholder = 'Jugador ' + (i+1); inp.maxLength = 20; inp.value = existing[i] || '';
+    row.appendChild(dot); row.appendChild(inp); pf.appendChild(row);
+  }
+}
+
+function setupDone() {
+  numPlayers = selectedCount; playerNames = [];
+  document.querySelectorAll('.player-input').forEach((inp, i) => {
+    if (i < numPlayers) playerNames.push((inp.value.trim() || ('Jugador ' + (i+1))).toUpperCase());
+  });
+  resetMulti();
+  showHandoff();
+}
+function setRounds(n) { numRounds = n; document.querySelectorAll('.rnd-btn').forEach(b => b.classList.toggle('on', Number(b.textContent) === n)); }
+function resetMulti() {
+  playerScores = new Array(numPlayers).fill(0); roundScores = playerNames.map(() => []);
+  curRound = 1; currentPlayerIdx = 0; leaderIdx = -1; leaderScore = 0; turnLive = 0;
+}
+function updateLeader() { leaderIdx = -1; leaderScore = 0; playerScores.forEach((v, i) => { if (v > leaderScore) { leaderScore = v; leaderIdx = i; } }); }
+function commitTurn(score) {
+  const pi = currentPlayerIdx;
+  roundScores[pi].push(score); playerScores[pi] += score; turnLive = 0; updateLeader(); renderLive();
+}
+
+// ── Live scoreboard: totals so far + the current turn, updated on every correct answer.
+let _lvLead = '';
+function renderLive() {
+  const el = document.getElementById('live-board'); if (!el) return;
+  if (mode !== 'multi' || !playerNames.length) { el.classList.remove('on'); el.innerHTML = ''; return; }
+  el.classList.add('on');
+  const tot = playerNames.map((n, i) => (playerScores[i] || 0) + (i === currentPlayerIdx ? turnLive : 0));
+  const top = Math.max(...tot), lead = top > 0 ? tot.map((v, i) => v === top ? i : -1).filter(i => i >= 0) : [];
+  const key = lead.join(','), changed = key !== _lvLead && lead.length > 0; _lvLead = key;
+  const half = playerNames.length >= 4 ? Math.ceil(playerNames.length / 2) : 99;
+  el.innerHTML = playerNames.map((n, i) => (i === half ? '<div class="brk"></div>' : '') + '<div class="lv' + (i === currentPlayerIdx ? ' cur' : '') + (lead.includes(i) ? ' lead' : '') + (changed && lead.includes(i) ? ' pulse' : '') + '">' +
+    '<span class="dot" style="background:' + pc(i) + '"></span><span class="nm">' + n + '</span><span class="sc">' + tot[i] + '</span></div>').join('');
+}
+
+/* ══════════ HANDOFF ══════════ */
+function showHandoff() {
+  const pi = currentPlayerIdx, n = pn(pi), c = pc(pi);
+  usedWords = new Set();
+  const firstWord = freshWord();
+  preloadFor(firstWord);
+
+  document.getElementById('handoff-name').innerHTML = '<span style="color:' + c + '">' + n + '</span>';
+  document.getElementById('handoff-name').style.color = c;
+  document.getElementById('handoff-sub').textContent = (numRounds > 1 ? 'Ronda ' + curRound + ' / ' + numRounds + ' · ' : '') + (currentPlayerIdx === 0 && curRound === 1 ? '¡Empiezas tú!' : '¡Tu turno!') + (curRound > 1 ? ' · Total: ' + playerScores[pi] : '');
+
+  const tgt = document.getElementById('handoff-target');
+  if (leaderIdx >= 0 && leaderIdx !== pi) {
+    const lc = pc(leaderIdx), ln = pn(leaderIdx), ls = playerScores[leaderIdx];
+    tgt.innerHTML = 'PUNTUACIÓN MÁS ALTA: <span style="color:' + lc + ';font-weight:bold">' + ln + '</span> CON <span style="color:#f0c040;font-weight:bold">' + ls + '</span> pts';
+    tgt.style.display = 'block';
+  } else {
+    tgt.style.display = 'none';
+  }
+  show('handoff-screen');
+}
+
+function handoffStart() {
+  const w = (_nextWord) ? _nextWord : freshWord();
+  if (!_nextAudio) preloadFor(w);
+  initGame(w);
+}
+
+/* ══════════ GAME ══════════ */
+function initGame(firstWord) {
+  wordNum = 1; locked = false; usedWords = new Set();
+
+  // Player HUD
+  if (mode === 'multi') {
+    const pi = currentPlayerIdx, c = pc(pi), n = pn(pi);
+    document.getElementById('player-hud').innerHTML = '<span style="color:' + c + '">' + n + '</span>';
+    document.getElementById('player-hud').style.display = 'block';
+    document.getElementById('target-hud').style.display = 'none';
+    turnLive = 0; renderLive();
+  } else {
+    document.getElementById('player-hud').style.display = 'none';
+    document.getElementById('target-hud').style.display = 'none';
+    renderLive();
+  }
+
+  document.getElementById('pts-flash').style.opacity = '0';
+  show('game-screen');
+  nextWord(firstWord);
+}
+
+function nextWord(forcedWord) {
+  if (locked) return;
+  cancelAnimationFrame(wordRAF);
+
+  // Update UI for current word
+  buildDots('county-dots', wordNum);
+  document.getElementById('word-num-label').innerHTML = 'Palabra ' + wordNum + ' / ' + TOTAL_WORDS + (HAS_MAP ? ' · <b>' + ESTADO_ORD[wordNum - 1][0] + '</b>' + (ESTADO_ORD.fact ? ' <span style="color:#888">(' + ESTADO_ORD.fact(ESTADO_ORD[wordNum - 1][0]) + ')</span>' : '') : '');
+  document.getElementById('score-display').textContent = wordNum - 1;
+  if (mode === 'multi') { turnLive = wordNum - 1; renderLive(); }
+
+  // Choose word
+  const word = forcedWord || freshWord(currentWord);
+  usedWords.add(word);
+  playWord(word);
+
+  // Build choices
+  const correct = meaning(word), wrong = meaning(rnd(word)), opts = sh([correct, wrong]);
+  correctIdx = opts.indexOf(correct);
+  currentWord = word;
+
+  document.getElementById('word-display').textContent = word;
+  document.getElementById('word-card').className = 'card';
+  ['choice-a','choice-b'].forEach((id, i) => {
+    const b = document.getElementById(id);
+    b.textContent = opts[i]; b.className = 'choice-btn'; b.disabled = false;
+  });
+
+  wordDeadline = Date.now() + WORD_MS;
+  tickWord();
+}
+
+function tickWord() {
+  const rem = wordDeadline - Date.now();
+  if (rem <= 0) {
+    document.getElementById('word-timer-bar').style.width = '0%';
+    locked = true;
+    bust('timeout');
+    return;
+  }
+  document.getElementById('word-timer-bar').style.width = (rem / WORD_MS * 100) + '%';
+  document.getElementById('word-timer-bar').className = rem <= 1500 ? 'urgent' : '';
+  wordRAF = requestAnimationFrame(tickWord);
+}
+
+function pick(idx) {
+  if (locked) return;
+  locked = true;
+  cancelAnimationFrame(wordRAF);
+
+  const btns = [document.getElementById('choice-a'), document.getElementById('choice-b')];
+  btns.forEach(b => b.disabled = true);
+
+  // iPhone: a word recording still playing can block the chime, so stop it first, and load the next word now, inside the tap.
+  if (_ca) { _ca.pause(); _ca = null; }
+  if (idx === correctIdx && wordNum < TOTAL_WORDS) preloadFor(freshWord(currentWord));
+
+  if (idx === correctIdx) {
+    playOk();
+    btns[idx].className = 'choice-btn selected-correct';
+    document.getElementById('word-card').className = 'card flash-correct';
+    const fl = document.getElementById('pts-flash');
+    fl.textContent = '+1'; fl.style.opacity = '1';
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(() => fl.style.opacity = '0', 600);
+    if (HAS_MAP) {   // fill this state in green, with its name
+      buildDots('county-dots', wordNum + 1, 'none');
+      const pop = document.getElementById('cpop'); pop.textContent = '✓ ' + ESTADO_ORD[wordNum - 1][0];
+      pop.classList.add('show'); setTimeout(() => pop.classList.remove('show'), 650);
+    }
+
+    if (wordNum === TOTAL_WORDS) {
+      setTimeout(() => victory(), 500);
+    } else {
+      wordNum++;
+      locked = false;
+      setTimeout(() => nextWord(_nextWord), 450);   // the word loaded during the tap
+    }
+  } else {
+    playNo();
+    btns[idx].className = 'choice-btn selected-wrong';
+    btns[correctIdx].className = 'choice-btn reveal-correct';
+    document.getElementById('word-card').className = 'card flash-dead';
+    setTimeout(() => bust('wrong'), 700);
+  }
+}
+
+/* ══════════ VICTORY ══════════ */
+function victory() {
+  cancelAnimationFrame(wordRAF);
+  if (_ca) { _ca.pause(); _ca = null; }
+  const score = mode === 'multi' ? TOTAL_WORDS * PERFECT_BONUS : TOTAL_WORDS;
+  playVictory();
+
+  buildDots('victory-dots', TOTAL_WORDS + 1, 'win');
+
+  if (mode === 'multi') {
+    const pi = currentPlayerIdx, c = pc(pi), n = pn(pi);
+    commitTurn(score);
+    document.getElementById('victory-player').innerHTML = '<span style="color:' + c + '">' + n + '</span><div style="color:#e07b00;font-size:.95rem;margin-top:.3rem">Victoria total: ¡puntos dobles! (32 × 2)</div>';
+    document.getElementById('victory-score').textContent = fmtFull(score);
+    const act = document.getElementById('victory-actions');
+    const nextPi = pi + 1;
+    if (nextPi < numPlayers) {
+      act.innerHTML = '<button class="big-btn gold" onclick="nextPlayer()">Pasa a ' + pn(nextPi) + ' →</button>';
+    } else if (curRound < numRounds) {
+      act.innerHTML = '<button class="big-btn gold" onclick="showFinal()">Clasificación tras la ronda ' + curRound + ' →</button>';
+    } else {
+      act.innerHTML = '<button class="big-btn gold" onclick="showFinal()">Clasificación 🏆</button>';
+    }
+  } else {
+    document.getElementById('victory-player').textContent = '';
+    document.getElementById('victory-score').textContent = fmtFull(score);
+    document.getElementById('victory-actions').innerHTML =
+      '<button class="big-btn gold" onclick="startSolo()">Otra vez</button>' +
+      '<button class="ghost-btn" onclick="goStart()">Inicio</button>';
+  }
+
+  show('victory-screen');
+}
+
+/* ══════════ BUST ══════════ */
+function bust(reason) {
+  cancelAnimationFrame(wordRAF);
+  if (_ca) { _ca.pause(); _ca = null; }
+
+  // Score = number of words answered correctly before this one
+  const score = wordNum - 1;
+
+  if (mode === 'multi') commitTurn(score);
+
+  const pi = currentPlayerIdx;
+  const nameEl = document.getElementById('over-player');
+  if (mode === 'multi') {
+    nameEl.innerHTML = '<span style="color:' + pc(pi) + '">' + pn(pi) + '</span>';
+  } else {
+    nameEl.textContent = '';
+  }
+
+  document.getElementById('over-reached').textContent =
+    wordNum === 1 ? '¡No acertaste la primera palabra!' :
+    'Llegaste a la palabra ' + (wordNum-1) + ' / ' + TOTAL_WORDS;
+
+  buildDots('over-dots', wordNum, 'lost');
+
+  const scoreEl = document.getElementById('over-score');
+  scoreEl.textContent = fmtFull(score);
+  scoreEl.style.color = score > 0 ? '#e94560' : '#aaa';
+
+  // Show the right answer in both languages, so a wrong guess still teaches the word
+  document.getElementById('over-wrong-word').textContent =
+    (reason === 'timeout' ? 'Tiempo agotado' : 'Respuesta incorrecta') +
+    ': ' + currentWord + ' = ' + DICT[currentWord][0] + ' (' + DICT[currentWord][1] + ')';
+
+  const act = document.getElementById('over-actions');
+  if (mode === 'solo') {
+    act.innerHTML = '<button class="big-btn" onclick="startSolo()">Otra vez</button>' +
+      '<button class="ghost-btn" onclick="goStart()">Inicio</button>';
+  } else {
+    const nextPi = pi + 1;
+    if (nextPi < numPlayers) {
+      act.innerHTML = '<button class="big-btn" onclick="nextPlayer()">Pasa a <strong>' + pn(nextPi) + '</strong> →</button>';
+    } else if (curRound < numRounds) {
+      act.innerHTML = '<button class="big-btn" onclick="showFinal()">Clasificación tras la ronda ' + curRound + ' →</button>';
+    } else {
+      act.innerHTML = '<button class="big-btn" onclick="showFinal()">Clasificación 🏆</button>';
+    }
+    if (numRounds > 1) act.innerHTML = '<p style="color:#555;margin-bottom:.6rem">Ronda ' + curRound + ' / ' + numRounds + ' · Puntuación total: <strong>' + playerScores[pi] + '</strong></p>' + act.innerHTML;
+  }
+
+  show('over-screen');
+}
+
+function nextPlayer() {
+  currentPlayerIdx++;
+  _nextAudio = null; _nextWord = null;
+  showHandoff();
+}
+
+/* ══════════ LEADERBOARD ══════════ */
+// Standings after each round, final leaderboard after the last; ranked by total, equal totals share a place
+function isFinalRound() { return curRound >= numRounds; }
+function showFinal() {
+  const fin = isFinalRound(), multi = numRounds > 1;
+  const ranked = playerNames.map((n, i) => ({ n, i, s: playerScores[i] || 0 })).sort((a, b) => b.s - a.s);
+  const medals = ['🥇','🥈','🥉']; let place = 0;
+  document.getElementById('lb-list').innerHTML = ranked.map((p, pos) => {
+    if (pos === 0 || p.s < ranked[pos - 1].s) place = pos;
+    const rounds = multi ? '<span class="lb-rounds">' + roundScores[p.i].join(' · ') + '</span>' : '';
+    return '<div class="lb-row' + (place === 0 && fin ? ' lb-winner' : '') + '">' +
+      '<div class="lb-rank">' + (medals[place] || (place + 1) + '.') + '</div>' +
+      '<div class="lb-dot" style="background:' + pc(p.i) + '"></div>' +
+      '<div class="lb-name">' + p.n + rounds + '</div>' +
+      '<div class="lb-score" style="color:' + pc(p.i) + '">' + p.s + ' pts</div></div>';
+  }).join('');
+  const tie = ranked.length > 1 && ranked[0].s === ranked[1].s;
+  document.getElementById('final-title').textContent = fin ? '🏆 ¡Fin!' : 'Tras la ronda ' + curRound + ' / ' + numRounds;
+  document.getElementById('final-sub').textContent = fin ? (tie ? '¡Empate! Comparten la victoria 🤝' : '🥇 ¡' + ranked[0].n + ' con ' + ranked[0].s + ' pts!') : 'Puntuación total hasta ahora';
+  document.getElementById('final-actions').innerHTML = fin
+    ? '<button class="big-btn" onclick="replayMulti()">Otra vez</button><button class="ghost-btn" onclick="goStart()">Inicio</button>'
+    : '<button class="big-btn" onclick="nextRound()">Ronda ' + (curRound + 1) + ' →</button>';
+  show('final-screen');
+}
+function nextRound() { curRound++; currentPlayerIdx = 0; _nextAudio = null; _nextWord = null; showHandoff(); }
+function replayMulti() { resetMulti(); _nextAudio = null; _nextWord = null; showHandoff(); }
+
+/* ══════════ KEYBOARD ══════════ */
+document.addEventListener('keydown', e => {
+  switch (currentScreen) {
+    case 'setup-screen':
+      if (e.key === 'Enter') { e.preventDefault(); setupDone(); } break;
+    case 'handoff-screen':
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handoffStart(); } break;
+    case 'game-screen':
+      if (e.key === 'ArrowUp'   || e.key === '1') { e.preventDefault(); pick(0); }
+      if (e.key === 'ArrowDown' || e.key === '2') { e.preventDefault(); pick(1); }
+      break;
+    case 'over-screen':
+    case 'victory-screen':
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (mode === 'solo') { startSolo(); }
+        else if (currentPlayerIdx + 1 < numPlayers) { nextPlayer(); }
+        else { showFinal(); }
+      } break;
+    case 'final-screen':
+      if (e.key === 'Enter') { e.preventDefault(); if (isFinalRound()) replayMulti(); else nextRound(); } break;
+  }
+});
+
+show('start-screen');
+setLang(LANG);
+// State order picker (alphabetical by default; remembered on this device)
+function pickOrd(key) {
+  setEstadoOrd(key);
+  try { localStorage.setItem('reto_ord', ESTADO_ORD.key); } catch (e) {}
+  buildDots('start-map', 0, 'none');
+}
+if (HAS_MAP && typeof ESTADO_ORDENES !== 'undefined') {
+  const sel = document.getElementById('ord-sel');
+  sel.innerHTML = Object.entries(ESTADO_ORDENES).map(([k, o]) => '<option value="' + k + '">' + o.es + '</option>').join('');
+  let saved = 'alfabetico'; try { saved = localStorage.getItem('reto_ord') || 'alfabetico'; } catch (e) {}
+  setEstadoOrd(saved); sel.value = ESTADO_ORD.key;
+  document.getElementById('ord-row').style.display = 'block';
+}
+if (HAS_MAP) buildDots('start-map', 0, 'none');   // grey map on the start screen
+</script>
+</body>
+</html>
