@@ -58,7 +58,7 @@ Words live in `diccionario-nahuatl.js`:
 - Then the Spanish meaning, the English meaning, and the recording's file name on the dictionary server (`AUDIO_BASE`).
 - Every meaning must be different from every other, so a wrong answer can never match the right one.
 
-The game needs well over 32 words so runs don't repeat. It currently has 79.
+The game needs well over 32 words so runs don't repeat. It currently has 77.
 
 When you change a script file, raise the `?v=` number on its `<script>` tag in `reto-nahuatl.html` (for example `?v=1` to `?v=2`) so browsers load the new copy and not a cached one.
 
